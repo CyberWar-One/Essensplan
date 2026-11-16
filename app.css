@@ -50,12 +50,9 @@ main { padding: 10px 8px; }
 .cell .note { font-size: .72rem; color: var(--muted); margin-top: auto; padding-top: 2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell .hol + .note { margin-top: 0; }
-.cell.drop { border-color: var(--brand); background: var(--accent); transform: scale(1.03); }
-.cell.dragsrc { opacity: .35; }
-.cell.movesrc { border-style: dashed; border-color: var(--brand); }
 .ghost { position: fixed; z-index: 50; pointer-events: none; padding: 12px 16px; border-radius: 14px;
   background: var(--brand); color: var(--brand-ink); font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.3);
-  transform: translate(-50%, -120%); max-width: 70vw; }
+  transform: translate(-50%, -100%); max-width: 62vw; opacity: .92; font-size: .95rem; }
 
 .actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 12px; }
 .hint { text-align: center; color: var(--muted); font-size: .8rem; margin: 10px 0 0; }
@@ -113,8 +110,22 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 .snackbar.show { display: flex; }
 .snackbar span { flex: 1; }
 .snackbar button { min-height: 48px; padding: 0 14px; border: 0; border-radius: 10px; background: #5fb38a; color: #0d1a13; font-weight: 700; }
-.movebanner { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: none; align-items: center; gap: 10px;
-  padding: calc(14px + env(safe-area-inset-top)) 12px 14px 16px; background: var(--today); color: #fff; font-weight: 700; font-size: 1.1rem; }
-.movebanner.show { display: flex; }
-.movebanner span { flex: 1; }
-.movebanner button { min-height: 48px; padding: 0 14px; border: 0; border-radius: 10px; background: #fff; color: #000; font-weight: 700; }
+
+/* Ziehen */
+.cell { transition: transform .15s, box-shadow .15s; }
+.cell.pressing { transform: scale(.96); }
+.cell.dragsrc { opacity: .35; border-style: dashed; }
+body.dragging { user-select: none; -webkit-user-select: none; }
+.dropline { position: fixed; z-index: 45; height: 5px; border-radius: 3px; background: #e0262b; pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(224,38,43,.25); display: none; }
+.dropline.show { display: block; }
+.dropline::before, .dropline::after { content: ''; position: absolute; top: -4px; width: 13px; height: 13px; border-radius: 50%; background: #e0262b; }
+.dropline::before { left: -6px; } .dropline::after { right: -6px; }
+.ghost { pointer-events: none; }
+
+/* Einstellungen / Schalter */
+.btn.toggle { text-align: left; }
+.btn.toggle.on { background: var(--accent); border-color: var(--brand); color: var(--brand); }
+select { font: inherit; width: 100%; min-height: 56px; margin-top: 6px; padding: 10px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+.row .grow { flex: 1; }

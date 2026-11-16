@@ -31,10 +31,15 @@ und es ist keine Freigabe für „unbekannte Quellen“ nötig.
 ## Bedienung
 - **Plan:** 2 Wochen auf einen Blick (links diese, rechts nächste Woche). ◀ ▶ blättert wochenweise,
   Tippen auf den Titel springt zurück zu heute.
-- **Tag antippen:** Gericht wählen, zufällig wählen, verschieben, entfernen, Notiz für den Tag.
-- **Lange drücken und ziehen:** Gericht auf einen anderen Tag schieben (belegte Tage werden getauscht).
+- **Tag antippen:** Gericht wählen, zufällig wählen, entfernen, Notiz für den Tag.
+- **Verschieben:** Gericht gedrückt halten (kurzes Vibrieren), dann ziehen. Ein **roter Strich** zeigt, wo es eingesetzt wird.
+  Loslassen = das Gericht kommt dorthin, die Gerichte dazwischen **rücken einen Tag nach**. Notizen bleiben am Datum.
+  Vergangene Tage werden nicht verändert.
 - **🎲 Automatisch füllen:** nur leere Tage oder alle ab heute. Kein Gericht wiederholt sich innerhalb von 14 Tagen;
   lange nicht gegessene Gerichte kommen bevorzugt dran.
+- **🥣 Suppen-Samstage:** In der Suppenzeit (Standard Oktober–April, unter ⚙️ Mehr einstellbar) setzt die Automatik
+  samstags nur Suppen und an den anderen Tagen keine. Im Raster steht dann 🥣 neben „Sa“. Von Hand geht alles.
+  Ob ein Gericht als Suppe zählt, lässt sich unter Gerichte → ✏️ umschalten.
 - **Rückgängig:** nach jeder Änderung ein paar Sekunden lang unten möglich.
 - **Gerichte:** 87 Gerichte aus den bisherigen Essensplänen sind vorinstalliert. Suchen (auch nach Kochbuch, z. B. „Walle“),
   neu anlegen (mit Prüfung auf ähnliche Namen), ✏️ bearbeiten (Name + 📖 Info wie „GU Cholesterin S. 64“), löschen,

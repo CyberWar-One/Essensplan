@@ -1,5 +1,5 @@
 /* Offline-Cache: Alle App-Dateien werden lokal gespeichert. Bei neuer Version CACHE erhöhen. */
-const CACHE = 'essensplan-v1.1.1';
+const CACHE = 'essensplan-v1.2.0';
 const FILES = ['./', 'index.html', 'app.css', 'app.js', 'logic.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

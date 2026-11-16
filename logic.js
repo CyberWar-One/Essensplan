@@ -131,18 +131,35 @@
     });
     return best;
   }
+  // ---------- Suppen-Samstage ----------
+  function isSoupName(name) { var n = normalize(name); return /suppe|eintopf/.test(n) || /^erasco\b/.test(n); }
+  function inSeason(key, from, to) {
+    var m = +key.slice(5, 7);
+    return from <= to ? (m >= from && m <= to) : (m >= from || m <= to);
+  }
+  /** 'soup' = nur Suppen, 'nosoup' = keine Suppen, null = egal. settings: {soupSat, soupFrom, soupTo} */
+  function soupRule(key, settings) {
+    if (!settings || !settings.soupSat || !inSeason(key, settings.soupFrom, settings.soupTo)) return null;
+    return fromKey(key).getDay() === 6 ? 'soup' : 'nosoup';
+  }
+
   /**
    * Füllt die Zieltage automatisch. Verändert eine KOPIE von plan und gibt {plan, filled, empty} zurück.
    * rnd: Zufallsfunktion (für Tests ersetzbar)
    */
-  function autoFill(plan, meals, targetKeys, rnd) {
+  function autoFill(plan, meals, targetKeys, rnd, settings) {
     rnd = rnd || Math.random;
     var p = JSON.parse(JSON.stringify(plan));
     targetKeys.forEach(function (k) { delete p[k]; });
     var pool = meals.filter(function (m) { return !m.noAuto; });
-    var filled = 0, empty = [];
+    var filled = 0, empty = [], fallback = [];
     targetKeys.slice().sort().forEach(function (k) {
-      var cands = pool.filter(function (m) { return conflicts(p, m.id, k).length === 0; });
+      var all = pool.filter(function (m) { return conflicts(p, m.id, k).length === 0; });
+      var rule = soupRule(k, settings), cands = all;
+      if (rule) {
+        cands = all.filter(function (m) { return rule === 'soup' ? !!m.soup : !m.soup; });
+        if (!cands.length) { cands = all; if (all.length) fallback.push(k); }
+      }
       if (!cands.length) { empty.push(k); return; }
       // Gewichtung: lange nicht gegessen bzw. nie gegessen -> wahrscheinlicher
       var weights = cands.map(function (m) {
@@ -155,7 +172,21 @@
       p[k] = { mealId: cands[idx].id };
       filled++;
     });
-    return { plan: p, filled: filled, empty: empty };
+    return { plan: p, filled: filled, empty: empty, fallback: fallback };
+  }
+
+  /**
+   * Einschieben mit Nachrücken: Gericht von keys[from] wird an Lücke gap (0..keys.length) gesetzt,
+   * die Tage dazwischen rücken um einen Tag nach. Leere Tage rücken mit. Notizen bleiben am Datum.
+   */
+  function insertMove(plan, keys, from, gap) {
+    var arr = keys.map(function (k) { return plan[k] || null; });
+    var item = arr.splice(from, 1)[0];
+    var target = gap > from ? gap - 1 : gap;
+    arr.splice(target, 0, item);
+    var p = Object.assign({}, plan);
+    keys.forEach(function (k, i) { if (arr[i]) p[k] = arr[i]; else delete p[k]; });
+    return { plan: p, target: target };
   }
 
   function swapDays(plan, a, b) {
@@ -173,13 +204,16 @@
       if (!m || typeof m.name !== 'string' || typeof m.id !== 'string') return;
       var name = m.name.trim().slice(0, 80); if (!name || ids[m.id]) return;
       ids[m.id] = 1;
-      out.meals.push({ id: m.id.slice(0, 40), name: name, info: typeof m.info === 'string' ? m.info.trim().slice(0, 200) : '',
+      out.meals.push({ id: m.id.slice(0, 40), name: name, soup: typeof m.soup === 'boolean' ? m.soup : isSoupName(name), info: typeof m.info === 'string' ? m.info.trim().slice(0, 200) : '',
         noAuto: !!m.noAuto, seed: !!m.seed, createdAt: +m.createdAt || Date.now() });
     });
     var plan = raw.plan && typeof raw.plan === 'object' ? raw.plan : {};
     Object.keys(plan).forEach(function (k) {
       if (keyRe.test(k) && plan[k] && ids[plan[k].mealId]) out.plan[k] = { mealId: plan[k].mealId };
     });
+    var st = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
+    function month(v, d) { v = Math.floor(+v); return v >= 1 && v <= 12 ? v : d; }
+    out.settings = { soupSat: st.soupSat !== false, soupFrom: month(st.soupFrom, 10), soupTo: month(st.soupTo, 4) };
     var notes = raw.notes && typeof raw.notes === 'object' ? raw.notes : {};
     Object.keys(notes).forEach(function (k) {
       if (keyRe.test(k) && typeof notes[k] === 'string' && notes[k].trim()) out.notes[k] = notes[k].slice(0, 2000);
@@ -191,7 +225,8 @@
     toKey: toKey, fromKey: fromKey, addDays: addDays, mondayOf: mondayOf, diffDays: diffDays, startOfDay: startOfDay,
     holidayName: holidayName, easterSunday: easterSunday,
     normalize: normalize, tokens: tokens, similarity: similarity, findSimilar: findSimilar, isSameName: isSameName,
-    conflicts: conflicts, lastEatenBefore: lastEatenBefore, autoFill: autoFill, swapDays: swapDays,
+    conflicts: conflicts, lastEatenBefore: lastEatenBefore, autoFill: autoFill, swapDays: swapDays, insertMove: insertMove,
+    isSoupName: isSoupName, inSeason: inSeason, soupRule: soupRule,
     sanitizeState: sanitizeState, NO_REPEAT_DAYS: NO_REPEAT_DAYS
   };
 })(typeof window !== 'undefined' ? window : globalThis);

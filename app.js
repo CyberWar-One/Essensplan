@@ -87,8 +87,9 @@
     // Sonstiges – wird von „Automatisch füllen“ nie gewählt
     ['Essen gehen', '', true], ['Restessen', '', true], ['Etwas aus TK', '', true], ['Asia-Essen (Nidderau)', 'Asia-Nudeln', true]
   ];
+  function defaultSettings() { return { soupSat: true, soupFrom: 10, soupTo: 4 }; }
   function startMeals() {
-    return MEALS_START.map(function (r) { return { id: uid(), name: r[0], info: r[1] || '', noAuto: !!r[2], seed: false, createdAt: Date.now() }; });
+    return MEALS_START.map(function (r) { return { id: uid(), name: r[0], info: r[1] || '', soup: EP.isSoupName(r[0]), noAuto: !!r[2], seed: false, createdAt: Date.now() }; });
   }
   /** Umstellung alter Installationen: alte Beispielgerichte (nur ungenutzte) raus, echte Gerichte rein. Nichts Genutztes wird gelöscht. */
   function migrateSeeds(s) {
@@ -111,7 +112,6 @@
   var state = load();
   var weekOffset = 0;
   var undoSnap = null, undoTimer = null;
-  var moveFrom = null;          // Tap-basiertes Verschieben
   var showPast = false;
 
   function uid() {
@@ -123,7 +123,7 @@
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) { var s = EP.sanitizeState(JSON.parse(raw)); s.lastBackup = JSON.parse(raw).lastBackup || null; return migrateSeeds(s); }
     } catch (e) { console.error(e); }
-    return { version: 1, meals: startMeals(), plan: {}, notes: {}, lastBackup: null, seedVersion: SEED_VERSION };
+    return { version: 1, meals: startMeals(), plan: {}, notes: {}, lastBackup: null, seedVersion: SEED_VERSION, settings: defaultSettings() };
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
@@ -215,11 +215,11 @@
   }
   function cell(k, tk) {
     var d = EP.fromKey(k), entry = state.plan[k], note = state.notes[k], hol = EP.holidayName(k);
-    var cls = 'cell' + (d.getDay() === 0 || d.getDay() === 6 ? ' weekend' : '') + (k === tk ? ' today' : '') + (k < tk ? ' past' : '') +
-      (moveFrom === k ? ' movesrc' : '');
+    var cls = 'cell' + (d.getDay() === 0 || d.getDay() === 6 ? ' weekend' : '') + (k === tk ? ' today' : '') + (k < tk ? ' past' : '');
+    var soupDay = EP.soupRule(k, state.settings) === 'soup';
     var name = entry ? mealName(entry.mealId) : '';
     var c = el('button', { cls: cls, 'data-key': k, 'aria-label': fmtLong(k) + ': ' + (name || 'nichts geplant') }, [
-      el('div', { cls: 'd' }, [el('span', { cls: 'wd', text: WD[d.getDay()] }), el('span', { text: d.getDate() + '.' + (d.getMonth() + 1) + '.' })]),
+      el('div', { cls: 'd' }, [el('span', { cls: 'wd', text: WD[d.getDay()] + (soupDay ? ' 🥣' : '') }), el('span', { text: d.getDate() + '.' + (d.getMonth() + 1) + '.' })]),
       el('div', { cls: 'm' + (name ? '' : ' empty'), text: name || '–' }),
       hol ? el('div', { cls: 'hol', text: '★ ' + hol }) : null,
       note ? el('div', { cls: 'note', text: '📝 ' + note }) : null
@@ -232,49 +232,71 @@
   $('grid').addEventListener('click', function (ev) {
     var c = ev.target.closest('.cell'); if (!c || suppressClick) return;
     var k = c.getAttribute('data-key');
-    if (moveFrom) { finishMove(k); return; }
     openDay(k);
   });
   $('grid').addEventListener('contextmenu', function (ev) { if (ev.target.closest('.cell')) ev.preventDefault(); });
 
-  // ---------- Drag & Drop (Touch: langes Drücken; Maus: direkt ziehen) ----------
+  // ---------- Drag & Drop: gedrückt halten, ziehen, roter Strich zeigt Einfügestelle ----------
   (function initDrag() {
-    var src = null, ghost = null, timer = null, sx = 0, sy = 0, dragging = false, over = null, mouse = false;
+    var HOLD_MS = 300;
+    var src = null, keys = [], from = -1, ghost = null, line = null, timer = null, scrollTimer = null;
+    var sx = 0, sy = 0, lastY = 0, dragging = false, mouse = false, gap = -1;
     function begin() {
       dragging = true;
-      if (navigator.vibrate) try { navigator.vibrate(25); } catch (e) { /* egal */ }
-      src.classList.add('dragsrc');
-      ghost = el('div', { cls: 'ghost', text: mealName(state.plan[src.getAttribute('data-key')].mealId) });
-      document.body.appendChild(ghost); place(sx, sy);
+      if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* egal */ }
+      src.classList.remove('pressing'); src.classList.add('dragsrc');
+      ghost = el('div', { cls: 'ghost', text: mealName(state.plan[keys[from]].mealId) });
+      line = el('div', { cls: 'dropline' });
+      document.body.appendChild(ghost); document.body.appendChild(line);
+      document.body.classList.add('dragging');
+      scrollTimer = setInterval(autoScroll, 30);
+      place(sx, sy);
+    }
+    function autoScroll() {
+      var edge = 90, h = window.innerHeight;
+      if (lastY < edge) window.scrollBy(0, -14);
+      else if (lastY > h - edge - 70) window.scrollBy(0, 14);
     }
     function place(x, y) {
-      if (!ghost) return;
-      ghost.style.left = x + 'px'; ghost.style.top = y + 'px';
+      lastY = y;
+      // schwebendes Gericht deutlich über dem Finger und immer ganz im Bild, damit der Strich sichtbar bleibt
+      var gw = ghost.offsetWidth, half = gw / 2 + 8;
+      ghost.style.left = Math.min(Math.max(x, half), window.innerWidth - half) + 'px';
+      ghost.style.top = Math.max(y - 56, ghost.offsetHeight + 8) + 'px';
       var t = document.elementFromPoint(x, y), c = t && t.closest ? t.closest('.cell') : null;
-      if (c === src) c = null;
-      if (over && over !== c) over.classList.remove('drop');
-      over = c; if (over) over.classList.add('drop');
+      if (!c) { if (!(t && t.closest && t.closest('#grid'))) hideLine(); return; } // im Spalt zwischen Kacheln: Strich bleibt
+      var idx = keys.indexOf(c.getAttribute('data-key')), r = c.getBoundingClientRect();
+      var g = y < r.top + r.height / 2 ? idx : idx + 1;
+      var todayIdx = keys.indexOf(todayKey()); if (todayIdx < 0) todayIdx = keys[0] > todayKey() ? 0 : keys.length;
+      if (g < todayIdx || g === from || g === from + 1) { hideLine(); return; }
+      gap = g;
+      // Strich oben an der Kachel (vor ihr) oder unten (nach ihr)
+      var top = g === idx ? r.top - 5 : r.bottom + 1;
+      line.style.left = r.left + 'px'; line.style.width = r.width + 'px'; line.style.top = top + 'px';
+      line.classList.add('show');
     }
+    function hideLine() { gap = -1; if (line) line.classList.remove('show'); }
     function reset() {
-      clearTimeout(timer); timer = null;
-      if (ghost) ghost.remove(); ghost = null;
-      if (src) src.classList.remove('dragsrc');
-      if (over) over.classList.remove('drop');
-      src = null; over = null; dragging = false;
+      clearTimeout(timer); timer = null; clearInterval(scrollTimer); scrollTimer = null;
+      if (ghost) ghost.remove(); if (line) line.remove(); ghost = null; line = null;
+      if (src) src.classList.remove('dragsrc', 'pressing');
+      document.body.classList.remove('dragging');
+      src = null; dragging = false; gap = -1; from = -1;
     }
     function start(x, y, target, isMouse) {
-      if (moveFrom) return;
       var c = target.closest && target.closest('.cell'); if (!c) return;
-      if (!state.plan[c.getAttribute('data-key')]) return; // nur gefüllte Tage ziehen
+      var k = c.getAttribute('data-key');
+      if (!state.plan[k] || k < todayKey()) return; // nur gefüllte, nicht vergangene Tage
+      keys = windowKeys(); from = keys.indexOf(k);
       src = c; sx = x; sy = y; mouse = isMouse;
-      if (!isMouse) timer = setTimeout(begin, 380);
+      if (!isMouse) { c.classList.add('pressing'); timer = setTimeout(begin, HOLD_MS); }
     }
     function move(x, y, ev) {
       if (!src) return;
       if (!dragging) {
         var dist = Math.abs(x - sx) + Math.abs(y - sy);
         if (mouse && dist > 8) begin();
-        else if (!mouse && dist > 12) { reset(); return; } // Nutzer scrollt
+        else if (!mouse && dist > 10) { reset(); return; } // Finger bewegt sich vor Ablauf -> scrollen
         else return;
       }
       if (ev.cancelable) ev.preventDefault();
@@ -283,15 +305,15 @@
     function end() {
       if (dragging) {
         suppressClick = true; setTimeout(function () { suppressClick = false; }, 350);
-        if (over) {
-          var a = src.getAttribute('data-key'), b = over.getAttribute('data-key');
-          reset(); doSwap(a, b); return;
-        }
+        var f = from, g = gap, ks = keys;
+        reset();
+        if (g >= 0) doInsert(ks, f, g);
+        return;
       }
       reset();
     }
     var grid = $('grid');
-    grid.addEventListener('touchstart', function (e) { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY, e.target, false); }, { passive: true });
+    grid.addEventListener('touchstart', function (e) { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY, e.target, false); else reset(); }, { passive: true });
     document.addEventListener('touchmove', function (e) { if (src) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
     document.addEventListener('touchend', end);
     document.addEventListener('touchcancel', reset);
@@ -300,17 +322,12 @@
     document.addEventListener('mouseup', end);
   })();
 
-  function doSwap(a, b) {
-    if (a === b) return;
-    var snap = snapshot(), ma = state.plan[a], mb = state.plan[b];
-    state.plan = EP.swapDays(state.plan, a, b);
-    var msg = mb ? fmtShort(a) + ' ⇄ ' + fmtShort(b) + ' getauscht' : mealName(ma.mealId) + ' → ' + fmtShort(b);
-    commit(msg, snap);
+  function doInsert(keys, from, gap) {
+    var snap = snapshot(), name = mealName(state.plan[keys[from]].mealId);
+    var res = EP.insertMove(state.plan, keys, from, gap);
+    state.plan = res.plan;
+    commit(name + ' → ' + fmtShort(keys[res.target]) + ', Rest rückt nach', snap);
   }
-  function startMove(k) { moveFrom = k; $('sheet').close(); $('moveBanner').classList.add('show'); renderGrid(); }
-  function finishMove(k) { var a = moveFrom; cancelMove(); doSwap(a, k); }
-  function cancelMove() { moveFrom = null; $('moveBanner').classList.remove('show'); renderGrid(); }
-  $('moveCancel').addEventListener('click', cancelMove);
 
   // ---------- Tages-Dialog ----------
   function openDay(k) {
@@ -328,7 +345,6 @@
     var g = el('div', { cls: 'grid2' }, [
       el('button', { cls: 'btn primary', text: '🍲 Gericht wählen', onclick: function () { openPicker(k); } }),
       el('button', { cls: 'btn', text: '🎲 Zufällig', onclick: function () { randomFor(k); } }),
-      entry ? el('button', { cls: 'btn', text: '↔ Verschieben', onclick: function () { startMove(k); } }) : null,
       entry ? el('button', { cls: 'btn danger', text: '✕ Entfernen', onclick: function () {
         var snap = snapshot(); delete state.plan[k]; $('sheet').close(); commit('Entfernt', snap); } }) : null
     ]);
@@ -351,7 +367,7 @@
   }
   function randomFor(k) {
     var cur = state.plan[k], meals = state.meals.filter(function (m) { return !cur || m.id !== cur.mealId; });
-    var res = EP.autoFill(state.plan, meals, [k]);
+    var res = EP.autoFill(state.plan, meals, [k], null, state.settings);
     if (!res.filled) { alertBox('Kein passendes Gericht gefunden – alle wären innerhalb von 2 Wochen doppelt. Bitte mehr Gerichte anlegen.'); return; }
     var snap = snapshot(); state.plan = res.plan; commit(fmtShort(k) + ': ' + mealName(res.plan[k].mealId), snap); openDay(k);
   }
@@ -376,6 +392,8 @@
     var addBtn = el('button', { cls: 'btn primary' });
     body.appendChild(inp); body.appendChild(addBtn); body.appendChild(scroll);
     body.appendChild(el('button', { cls: 'btn', text: '← Zurück', onclick: function () { openDay(k); } }));
+    var soupFirst = EP.soupRule(k, state.settings) === 'soup';
+    if (soupFirst) body.insertBefore(el('p', { cls: 'muted', text: '🥣 Suppen-Samstag – Suppen stehen oben' }), inp);
     function draw() {
       var q = inp.value.trim(), nq = EP.normalize(q);
       list.textContent = '';
@@ -386,12 +404,13 @@
         return !nq || EP.normalize(it.m.name).indexOf(nq) >= 0 || EP.similarity(q, it.m.name) >= 0.6;
       }).sort(function (a, b) {
         if (!!a.conf.length !== !!b.conf.length) return a.conf.length ? 1 : -1;
+        if (soupFirst && !!a.m.soup !== !!b.m.soup) return a.m.soup ? -1 : 1;
         return a.m.name.localeCompare(b.m.name, 'de');
       });
       items.forEach(function (it) {
         var sub = it.conf.length ? 'schon am ' + it.conf.map(fmtShort).join(', ') : (it.last ? 'zuletzt ' + relDays(it.last) : 'noch nie geplant');
         list.appendChild(el('li', { cls: 'pick', onclick: function () { assign(k, it.m.id); } }, [
-          el('div', { cls: 'grow' }, [el('div', { cls: 'name', text: it.m.name }),
+          el('div', { cls: 'grow' }, [el('div', { cls: 'name', text: (it.m.soup ? '🥣 ' : '') + it.m.name }),
             it.m.info ? el('div', { cls: 'sub', text: '📖 ' + it.m.info }) : null,
             el('div', { cls: 'sub' + (it.conf.length ? ' warn' : ''), text: sub })])
         ]));
@@ -434,7 +453,7 @@
       if (r !== '__new') return mealById(r);
     }
     if (excludeId) return { name: name };
-    var meal = { id: uid(), name: name, info: '', noAuto: false, seed: false, createdAt: Date.now() };
+    var meal = { id: uid(), name: name, info: '', soup: EP.isSoupName(name), noAuto: false, seed: false, createdAt: Date.now() };
     state.meals.push(meal); save(); renderMeals();
     return meal;
   }
@@ -451,7 +470,7 @@
       var sub = [next ? 'geplant ' + fmtShort(next) : null, last ? 'zuletzt ' + relDays(last) : null, m.noAuto ? 'nicht bei Automatik' : null]
         .filter(Boolean).join(' · ') || 'noch nie geplant';
       list.appendChild(el('li', {}, [
-        el('div', { cls: 'grow' }, [el('div', { cls: 'name', text: m.name }),
+        el('div', { cls: 'grow' }, [el('div', { cls: 'name', text: (m.soup ? '🥣 ' : '') + m.name }),
           m.info ? el('div', { cls: 'sub', text: '📖 ' + m.info }) : null, el('div', { cls: 'sub', text: sub })]),
         el('button', { cls: 'ico', 'aria-label': 'Automatik an/aus', text: m.noAuto ? '🚫' : '🎲', onclick: function () {
           m.noAuto = !m.noAuto; save(); renderMeals(); snack(m.noAuto ? 'Wird nicht mehr automatisch gewählt' : 'Wird wieder automatisch gewählt'); } }),
@@ -477,6 +496,10 @@
     body.appendChild(el('h3', { text: 'Gericht bearbeiten' }));
     body.appendChild(el('label', { cls: 'lbl', for: 'editName', text: 'Name' })); body.appendChild(inp);
     body.appendChild(el('label', { cls: 'lbl', for: 'editInfo', text: '📖 Info (Kochbuch, Seite, Hinweis)' })); body.appendChild(info);
+    var soup = !!m.soup, soupBtn = el('button', { id: 'editSoup', cls: 'btn toggle', type: 'button' });
+    function drawSoup() { soupBtn.textContent = soup ? '🥣 Suppe / Eintopf: JA' : '🥣 Suppe / Eintopf: nein'; soupBtn.classList.toggle('on', soup); }
+    soupBtn.addEventListener('click', function () { soup = !soup; drawSoup(); }); drawSoup();
+    body.appendChild(soupBtn);
     body.appendChild(el('div', { cls: 'grid2' }, [
       el('button', { cls: 'btn', text: 'Abbrechen', onclick: function () { $('sheet').close(); } }),
       el('button', { cls: 'btn primary', text: 'Speichern', onclick: async function () {
@@ -486,7 +509,7 @@
           if (!r || !r.name) return;
           newName = r.name;
         }
-        var snap = snapshot(); m.name = newName; m.info = info.value.trim().slice(0, 200);
+        var snap = snapshot(); m.name = newName; m.info = info.value.trim().slice(0, 200); m.soup = soup;
         $('sheet').close(); commit('Gespeichert', snap);
       } })
     ]));
@@ -515,9 +538,10 @@
     if (!choice) return;
     var targets = choice === 'all' ? keys : emptyKeys;
     if (!targets.length) { snack('Alle Tage sind schon gefüllt'); return; }
-    var snap = snapshot(), res = EP.autoFill(state.plan, state.meals, targets);
+    var snap = snapshot(), res = EP.autoFill(state.plan, state.meals, targets, null, state.settings);
     state.plan = res.plan;
     commit(res.filled + ' Tage gefüllt', snap);
+    if (res.fallback.length && !res.empty.length) alertBox('Für ' + res.fallback.map(fmtShort).join(', ') + ' war keine passende Suppe frei – dort steht ein anderes Gericht.\nTipp: Bei Gerichten unter „Gerichte“ → ✏️ „Suppe“ markieren.');
     if (res.empty.length) alertBox(res.empty.length + ' Tag(e) blieben leer: Es gibt nicht genug Gerichte, ohne dass sich innerhalb von 2 Wochen etwas wiederholt.\nBitte mehr Gerichte anlegen oder bei manchen 🚫 wieder auf 🎲 stellen.');
   });
   $('clearBtn').addEventListener('click', async function () {
@@ -561,7 +585,24 @@
   $('showPastNotes').addEventListener('click', function () { showPast = !showPast; renderNotes(); });
 
   // ---------- Sicherung ----------
+  var MON_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  (function initSettings() {
+    ['soupFrom', 'soupTo'].forEach(function (id) {
+      MON_SHORT.forEach(function (n, i) { var o = el('option', { value: String(i + 1), text: n }); $(id).appendChild(o); });
+      $(id).addEventListener('change', function () { state.settings[id] = +this.value; save(); renderAll(); snack('Gespeichert'); });
+    });
+    $('soupToggle').addEventListener('click', function () { state.settings.soupSat = !state.settings.soupSat; save(); renderAll(); });
+  })();
+  function renderSettings() {
+    var st = state.settings;
+    $('soupToggle').textContent = st.soupSat ? '🥣 Suppen-Samstage: AN' : '🥣 Suppen-Samstage: aus';
+    $('soupToggle').classList.toggle('on', st.soupSat);
+    $('soupFrom').value = String(st.soupFrom); $('soupTo').value = String(st.soupTo);
+    $('soupMonths').style.display = st.soupSat ? '' : 'none';
+    $('soupCount').textContent = state.meals.filter(function (m) { return m.soup && !m.noAuto; }).length + ' Suppen in der Automatik';
+  }
   function renderMore() {
+    renderSettings();
     var used = Object.keys(state.plan).length;
     $('stats').textContent = state.meals.length + ' Gerichte · ' + used + ' geplante Tage (inkl. Verlauf) · ' + Object.keys(state.notes).length + ' Notizen';
     $('lastBackup').textContent = state.lastBackup ? 'Letzte Sicherung: ' + new Date(state.lastBackup).toLocaleString('de-DE') : 'Noch keine Sicherung gespeichert – empfohlen!';
@@ -599,7 +640,7 @@
     var ok = await ask('Wirklich ALLES löschen?\nGerichte, Plan und Notizen sind danach weg (außer du hast eine Sicherung).', [
       { label: 'Ja, alles löschen', value: true, cls: 'danger' }, { label: 'Abbrechen', value: false }]);
     if (!ok) return;
-    var snap = snapshot(); state = { version: 1, meals: [], plan: {}, notes: {}, lastBackup: null, seedVersion: SEED_VERSION }; commit('Alles gelöscht', snap);
+    var snap = snapshot(); state = { version: 1, meals: [], plan: {}, notes: {}, lastBackup: null, seedVersion: SEED_VERSION, settings: state.settings }; commit('Alles gelöscht', snap);
   });
 
   // ---------- Navigation ----------

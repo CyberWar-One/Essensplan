@@ -28,7 +28,7 @@
       <button class="btn primary" id="autoBtn">🎲 Automatisch füllen</button>
       <button class="btn" id="clearBtn">🧹 Leeren</button>
     </div>
-    <p class="hint">Tippen = bearbeiten · Lange drücken &amp; ziehen = verschieben</p>
+    <p class="hint">Tippen = bearbeiten · Gedrückt halten &amp; ziehen = verschieben (roter Strich = Einfügestelle)</p>
   </section>
 
   <section id="view-meals" class="view">
@@ -58,6 +58,15 @@
   <section id="view-more" class="view">
     <h2>Sicherung &amp; Einstellungen</h2>
     <div class="card">
+      <button class="btn toggle" id="soupToggle"></button>
+      <p class="muted">„Automatisch füllen“ setzt in dieser Zeit samstags nur Suppen und an den anderen Tagen keine. Von Hand geht alles.</p>
+      <div class="row" id="soupMonths">
+        <label class="lbl grow" for="soupFrom">von<select id="soupFrom"></select></label>
+        <label class="lbl grow" for="soupTo">bis<select id="soupTo"></select></label>
+      </div>
+      <p class="muted" id="soupCount"></p>
+    </div>
+    <div class="card">
       <p><strong>Wo sind die Daten?</strong> Nur auf diesem Handy, im Speicher der App. Nichts geht ins Internet.</p>
       <p class="muted" id="persistInfo"></p>
       <p class="muted" id="lastBackup"></p>
@@ -70,7 +79,7 @@
       <button class="btn" id="removeSeeds">Beispielgerichte entfernen</button>
       <button class="btn danger" id="resetAll">Alles löschen</button>
     </div>
-    <p class="muted center">Essensplan v1.1.1</p>
+    <p class="muted center">Essensplan v1.2</p>
   </section>
 </main>
 
@@ -87,7 +96,6 @@
   <div class="confirm-btns" id="confirmBtns"></div>
 </dialog>
 <div id="snackbar" class="snackbar" role="status" aria-live="polite"><span id="snackText"></span><button id="snackBtn">Rückgängig</button></div>
-<div id="moveBanner" class="movebanner"><span>Ziel-Tag antippen…</span><button id="moveCancel">Abbrechen</button></div>
 
 <script src="logic.js"></script>
 <script src="app.js"></script>
