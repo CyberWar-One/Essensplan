@@ -15,7 +15,7 @@
 <body>
 <header class="topbar">
   <button class="iconbtn" id="prevWeek" aria-label="Eine Woche zurück">◀</button>
-  <button class="title" id="todayBtn" aria-label="Zur aktuellen Woche">
+  <button class="title" id="todayBtn" aria-label="Jahreskalender öffnen">
     <span class="t1">Essensplan</span><span class="t2" id="rangeLabel"></span>
   </button>
   <button class="iconbtn" id="nextWeek" aria-label="Eine Woche vor">▶</button>
@@ -71,6 +71,12 @@
       <p class="muted" id="persistInfo"></p>
       <p class="muted" id="lastBackup"></p>
       <button class="btn primary" id="exportBtn">⬇️ Sicherung speichern</button>
+      <label class="lbl" for="backupEvery">🔔 An Sicherung erinnern</label>
+      <select id="backupEvery">
+        <option value="0">Aus</option><option value="7">Jede Woche</option>
+        <option value="14">Alle 2 Wochen</option><option value="30">Jeden Monat</option>
+      </select>
+      <p class="muted">Die Erinnerung erscheint beim Öffnen der App, wenn eine Sicherung fällig ist.</p>
       <button class="btn" id="importBtn">⬆️ Sicherung laden</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
     </div>
@@ -79,7 +85,7 @@
       <button class="btn" id="removeSeeds">Beispielgerichte entfernen</button>
       <button class="btn danger" id="resetAll">Alles löschen</button>
     </div>
-    <p class="muted center">Essensplan v1.2</p>
+    <p class="muted center">Essensplan v1.3</p>
   </section>
 </main>
 
@@ -90,6 +96,17 @@
   <button class="tab" data-view="more"><span>⚙️</span>Mehr</button>
 </nav>
 
+<dialog id="cal" class="calendar" aria-label="Jahreskalender">
+  <div class="calhead">
+    <button class="iconbtn" id="calPrev" aria-label="Jahr zurück">◀</button>
+    <div class="calyear" id="calYear"></div>
+    <button class="iconbtn" id="calNext" aria-label="Jahr vor">▶</button>
+    <button class="iconbtn" id="calClose" aria-label="Schließen">✕</button>
+  </div>
+  <div class="chips" id="calChips"></div>
+  <p class="callegend"><i class="dm"></i> Essen geplant &nbsp; <i class="dn"></i> Notiz &nbsp; <b class="holc">rot</b> = Feiertag</p>
+  <div class="calmonths" id="calMonths"></div>
+</dialog>
 <dialog id="sheet" class="sheet"><div id="sheetBody"></div></dialog>
 <dialog id="confirm" class="confirm">
   <p id="confirmText"></p>

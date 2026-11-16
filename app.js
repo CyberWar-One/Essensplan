@@ -87,7 +87,7 @@
     // Sonstiges – wird von „Automatisch füllen“ nie gewählt
     ['Essen gehen', '', true], ['Restessen', '', true], ['Etwas aus TK', '', true], ['Asia-Essen (Nidderau)', 'Asia-Nudeln', true]
   ];
-  function defaultSettings() { return { soupSat: true, soupFrom: 10, soupTo: 4 }; }
+  function defaultSettings() { return { soupSat: true, soupFrom: 10, soupTo: 4, backupEvery: 30, remindBase: Date.now(), snoozeUntil: 0 }; }
   function startMeals() {
     return MEALS_START.map(function (r) { return { id: uid(), name: r[0], info: r[1] || '', soup: EP.isSoupName(r[0]), noAuto: !!r[2], seed: false, createdAt: Date.now() }; });
   }
@@ -202,7 +202,7 @@
     g.appendChild(el('div', { cls: 'colhead', text: weekLabel(w2, w2e) }));
     for (var r = 0; r < 7; r++) { g.appendChild(cell(keys[r], tk)); g.appendChild(cell(keys[r + 7], tk)); }
     var s = EP.fromKey(keys[0]), e = EP.fromKey(keys[13]);
-    $('rangeLabel').textContent = s.getDate() + '.' + (s.getMonth() + 1) + '. – ' + e.getDate() + '.' + (e.getMonth() + 1) + '.' + e.getFullYear();
+    $('rangeLabel').textContent = s.getDate() + '.' + (s.getMonth() + 1) + '. – ' + e.getDate() + '.' + (e.getMonth() + 1) + '.' + e.getFullYear() + ' 📅';
   }
   function weekLabel(a, b) {
     var cur = EP.toKey(EP.mondayOf(new Date())), lbl = a === cur ? 'Diese Woche' : (a === EP.toKey(EP.addDays(EP.fromKey(cur), 7)) ? 'Nächste Woche' : 'KW ' + isoWeek(EP.fromKey(a)));
@@ -605,16 +605,38 @@
     renderSettings();
     var used = Object.keys(state.plan).length;
     $('stats').textContent = state.meals.length + ' Gerichte · ' + used + ' geplante Tage (inkl. Verlauf) · ' + Object.keys(state.notes).length + ' Notizen';
+    $('backupEvery').value = String(state.settings.backupEvery);
     $('lastBackup').textContent = state.lastBackup ? 'Letzte Sicherung: ' + new Date(state.lastBackup).toLocaleString('de-DE') : 'Noch keine Sicherung gespeichert – empfohlen!';
     $('removeSeeds').style.display = state.meals.some(function (m) { return m.seed; }) ? '' : 'none';
   }
-  $('exportBtn').addEventListener('click', function () {
-    var data = JSON.stringify({ app: 'essensplan', exportedAt: new Date().toISOString(), version: 1, meals: state.meals, plan: state.plan, notes: state.notes }, null, 1);
+  function doExport() {
+    var data = JSON.stringify({ app: 'essensplan', exportedAt: new Date().toISOString(), version: 1, seedVersion: state.seedVersion,
+      settings: state.settings, meals: state.meals, plan: state.plan, notes: state.notes }, null, 1);
     var blob = new Blob([data], { type: 'application/json' }), a = el('a', { download: 'essensplan-sicherung-' + todayKey() + '.json' });
     a.href = URL.createObjectURL(blob); document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-    state.lastBackup = Date.now(); save(); renderMore(); snack('Sicherung im Ordner „Downloads“ gespeichert');
+    state.lastBackup = Date.now(); state.settings.snoozeUntil = 0; save(); renderMore();
+    snack('Sicherung im Ordner „Downloads“ gespeichert');
+  }
+  $('exportBtn').addEventListener('click', doExport);
+
+  // ---------- Sicherungs-Erinnerung (erscheint beim Öffnen der App, wenn fällig) ----------
+  $('backupEvery').addEventListener('change', function () {
+    state.settings.backupEvery = +this.value; state.settings.remindBase = Date.now(); state.settings.snoozeUntil = 0;
+    save(); renderMore(); snack(+this.value ? 'Erinnerung eingestellt' : 'Erinnerung ausgeschaltet');
   });
+  var reminderOpen = false;
+  async function checkBackupReminder() {
+    if (reminderOpen || document.hidden || $('confirm').open || $('sheet').open) return;
+    if (!EP.backupDue(state.settings, state.lastBackup, Date.now())) return;
+    reminderOpen = true;
+    var last = state.lastBackup ? 'Letzte Sicherung: vor ' + Math.floor((Date.now() - state.lastBackup) / 86400000) + ' Tagen.' : 'Es wurde noch keine Sicherung gespeichert.';
+    var r = await ask('💾 Zeit für eine Sicherung!\n' + last + '\n\nDie Datei landet im Ordner „Downloads“. Am besten zusätzlich weiterschicken (z. B. per WhatsApp).',
+      [{ label: '⬇️ Jetzt sichern', value: 'now', cls: 'primary' }, { label: 'Morgen erinnern', value: 'later' }]);
+    reminderOpen = false;
+    if (r === 'now') doExport();
+    else { state.settings.snoozeUntil = Date.now() + 86400000; save(); }
+  }
   $('importBtn').addEventListener('click', function () { $('importFile').value = ''; $('importFile').click(); });
   $('importFile').addEventListener('change', async function () {
     var f = this.files[0]; if (!f) return;
@@ -652,7 +674,59 @@
   document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { showView(t.getAttribute('data-view')); }); });
   $('prevWeek').addEventListener('click', function () { weekOffset--; renderGrid(); });
   $('nextWeek').addEventListener('click', function () { weekOffset++; renderGrid(); });
-  $('todayBtn').addEventListener('click', function () { weekOffset = 0; showView('plan'); renderGrid(); });
+  $('todayBtn').addEventListener('click', function () { openCalendar(); });
+
+  // ---------- Jahreskalender (Tippen auf die Überschrift) ----------
+  var calYear = new Date().getFullYear();
+  function jumpTo(k) {
+    weekOffset = Math.round(EP.diffDays(EP.mondayOf(new Date()), EP.mondayOf(EP.fromKey(k))) / 7);
+    if ($('cal').open) $('cal').close();
+    showView('plan'); renderGrid();
+    var c = document.querySelector('.cell[data-key="' + k + '"]');
+    if (c) { c.classList.add('flash'); c.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(function () { c.classList.remove('flash'); }, 1800); }
+  }
+  function openCalendar() {
+    calYear = EP.fromKey(windowKeys()[0]).getFullYear();
+    renderCalendar(); $('cal').showModal();
+    var m = document.querySelector('#calMonths .month[data-m="' + (EP.fromKey(windowKeys()[0]).getMonth()) + '"]');
+    if (m && calYear === EP.fromKey(windowKeys()[0]).getFullYear()) $('calMonths').scrollTop = m.offsetTop - $('calMonths').offsetTop - 4;
+    else $('calMonths').scrollTop = 0;
+  }
+  function renderCalendar() {
+    $('calYear').textContent = String(calYear);
+    var tk = todayKey(), win = windowKeys(), box = $('calMonths');
+    // Schnellsprünge: Heute + die nächsten Feiertage
+    var chips = $('calChips'); chips.textContent = '';
+    chips.appendChild(el('button', { cls: 'chip primary', text: '📍 Heute', onclick: function () { jumpTo(tk); } }));
+    var d = new Date(), n = 0;
+    for (var i = 1; i <= 366 && n < 4; i++) {
+      var k = EP.toKey(EP.addDays(d, i)), h = EP.holidayName(k);
+      if (h) { n++; (function (k, h) { chips.appendChild(el('button', { cls: 'chip', text: h + ' ' + fmtShort(k).slice(3), onclick: function () { jumpTo(k); } })); })(k, h); }
+    }
+    box.textContent = '';
+    for (var m = 0; m < 12; m++) {
+      var first = new Date(calYear, m, 1), days = new Date(calYear, m + 1, 0).getDate(), lead = (first.getDay() + 6) % 7;
+      var g = el('div', { cls: 'mgrid' });
+      ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].forEach(function (w) { g.appendChild(el('div', { cls: 'wh', text: w })); });
+      for (var b = 0; b < lead; b++) g.appendChild(el('div'));
+      for (var day = 1; day <= days; day++) {
+        var dt = new Date(calYear, m, day), k2 = EP.toKey(dt), hol = EP.holidayName(k2), note = state.notes[k2], meal = state.plan[k2];
+        var cls = 'cd' + (k2 === tk ? ' today' : '') + (k2 < tk ? ' past' : '') + (dt.getDay() === 0 || dt.getDay() === 6 ? ' we' : '') +
+          (hol ? ' hol' : '') + (win.indexOf(k2) >= 0 ? ' inwin' : '');
+        var label = fmtLong(k2) + (hol ? ', ' + hol : '') + (note ? ', Notiz: ' + note : '') + (meal ? ', ' + mealName(meal.mealId) : '');
+        (function (k2) {
+          g.appendChild(el('button', { cls: cls, 'aria-label': label, title: label, onclick: function () { jumpTo(k2); } }, [
+            el('span', { text: String(day) }),
+            el('span', { cls: 'dots' }, [meal ? el('i', { cls: 'dm' }) : null, note ? el('i', { cls: 'dn' }) : null])
+          ]));
+        })(k2);
+      }
+      box.appendChild(el('div', { cls: 'month', 'data-m': String(m) }, [el('h4', { text: MON[m] + ' ' + calYear }), g]));
+    }
+  }
+  $('calPrev').addEventListener('click', function () { calYear--; renderCalendar(); $('calMonths').scrollTop = 0; });
+  $('calNext').addEventListener('click', function () { calYear++; renderCalendar(); $('calMonths').scrollTop = 0; });
+  $('calClose').addEventListener('click', function () { $('cal').close(); });
   // Tippen auf den Hintergrund schließt den Tagesdialog
   $('sheet').addEventListener('click', function (e) { if (e.target === this) this.close(); });
 
@@ -660,7 +734,11 @@
 
   // Tageswechsel (App bleibt im Hintergrund offen)
   var lastDay = todayKey();
-  document.addEventListener('visibilitychange', function () { if (!document.hidden && todayKey() !== lastDay) { lastDay = todayKey(); renderAll(); } });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    if (todayKey() !== lastDay) { lastDay = todayKey(); renderAll(); }
+    setTimeout(checkBackupReminder, 800);
+  });
 
   // Dauerhaften Speicher anfordern, damit Android die Daten nicht automatisch löscht
   if (navigator.storage && navigator.storage.persist) {
@@ -674,5 +752,6 @@
 
   $('noteDate').value = todayKey();
   save(); renderAll();
+  setTimeout(checkBackupReminder, 1200);
   window.__ep = { get state() { return state; } }; // für Tests
 })();

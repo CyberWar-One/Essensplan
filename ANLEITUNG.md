@@ -29,8 +29,10 @@ Ehrliche Einschätzung: Die .apk ist im Kern dieselbe App. Weg A ist einfacher, 
 und es ist keine Freigabe für „unbekannte Quellen“ nötig.
 
 ## Bedienung
-- **Plan:** 2 Wochen auf einen Blick (links diese, rechts nächste Woche). ◀ ▶ blättert wochenweise,
-  Tippen auf den Titel springt zurück zu heute.
+- **Plan:** 2 Wochen auf einen Blick (links diese, rechts nächste Woche). ◀ ▶ blättert wochenweise.
+- **📅 Jahreskalender:** Oben auf „Essensplan“ tippen. Dort gibt es Schnellsprünge („Heute“, die nächsten Feiertage
+  wie Heiligabend oder Silvester), ◀ ▶ blättert die Jahre. Einen Tag antippen = der Plan springt in diese Woche.
+  Grüner Punkt = Essen geplant, oranger Punkt = Notiz, rote Zahl = Feiertag.
 - **Tag antippen:** Gericht wählen, zufällig wählen, entfernen, Notiz für den Tag.
 - **Verschieben:** Gericht gedrückt halten (kurzes Vibrieren), dann ziehen. Ein **roter Strich** zeigt, wo es eingesetzt wird.
   Loslassen = das Gericht kommt dorthin, die Gerichte dazwischen **rücken einen Tag nach**. Notizen bleiben am Datum.
@@ -46,6 +48,9 @@ und es ist keine Freigabe für „unbekannte Quellen“ nötig.
   🎲/🚫 = bei Automatik berücksichtigen oder nicht (z. B. „Essen gehen“, „Reste“).
 - **Termine:** Notizen für beliebige Tage, z. B. Weihnachten. Sie erscheinen auch im Plan. Feiertage sind markiert.
 - **Mehr → Sicherung speichern:** legt eine Datei im Download-Ordner ab. **Regelmäßig machen!**
+- **🔔 Sicherungs-Erinnerung:** Unter Mehr wählbar: Aus / jede Woche / alle 2 Wochen / jeden Monat (Standard).
+  Ist eine Sicherung fällig, fragt die App beim Öffnen „Jetzt sichern“ oder „Morgen erinnern“.
+  (Benachrichtigungen bei geschlossener App sind ohne Server nicht zuverlässig möglich.)
 
 ## Datenspeicherung
 Gespeichert wird im lokalen Browser-Speicher der App (localStorage), und die App fordert „dauerhaften Speicher“ an.

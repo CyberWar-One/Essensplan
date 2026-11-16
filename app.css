@@ -129,3 +129,34 @@ body.dragging { user-select: none; -webkit-user-select: none; }
 select { font: inherit; width: 100%; min-height: 56px; margin-top: 6px; padding: 10px; border-radius: 12px;
   border: 2px solid var(--line); background: var(--card); color: var(--ink); }
 .row .grow { flex: 1; }
+
+/* Jahreskalender */
+.calendar { width: 100%; max-width: 640px; height: 100%; max-height: 100%; margin: 0 auto; padding: 0;
+  display: none; flex-direction: column; }
+.calendar[open] { display: flex; }
+.calhead { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
+  background: var(--brand); color: var(--brand-ink); }
+.calyear { flex: 1; text-align: center; font-size: 1.4rem; font-weight: 800; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px; flex: none; }
+.chip { flex: none; min-height: 48px; padding: 0 14px; border-radius: 99px; border: 2px solid var(--line); background: var(--card);
+  font-weight: 700; font-size: .9rem; white-space: nowrap; }
+.chip.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.callegend { margin: 0 12px 4px; font-size: .8rem; color: var(--muted); }
+.callegend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; }
+.holc { color: var(--holiday); }
+.calmonths { flex: 1; overflow-y: auto; padding: 0 10px calc(20px + env(safe-area-inset-bottom)); }
+.month h4 { margin: 14px 4px 6px; font-size: 1.1rem; }
+.mgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.mgrid .wh { text-align: center; font-size: .75rem; font-weight: 700; color: var(--muted); padding: 2px 0; }
+.cd { min-height: 46px; border: 0; border-radius: 10px; background: var(--card); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-weight: 600; font-size: 1rem; padding: 2px; }
+.cd.we { background: var(--weekend); }
+.cd.past { opacity: .45; }
+.cd.hol { color: var(--holiday); font-weight: 800; }
+.cd.inwin { background: var(--accent); }
+.cd.today { box-shadow: 0 0 0 3px var(--today) inset; }
+.cd .dots { display: flex; gap: 3px; height: 7px; }
+i.dm, i.dn { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+i.dm { background: var(--brand); } i.dn { background: var(--today); }
+.cell.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px var(--today); } 100% { box-shadow: 0 0 0 0 transparent; } }

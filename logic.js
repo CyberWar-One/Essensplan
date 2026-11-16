@@ -196,6 +196,15 @@
     return p;
   }
 
+  // ---------- Sicherungs-Erinnerung ----------
+  /** Ist eine Sicherung fällig? every = Tage (0 = aus). Basis: letzte Sicherung, sonst Zeitpunkt der Einrichtung. */
+  function backupDue(settings, lastBackup, now) {
+    if (!settings || !settings.backupEvery) return false;
+    if (settings.snoozeUntil && now < settings.snoozeUntil) return false;
+    var base = lastBackup || settings.remindBase || now;
+    return now - base >= settings.backupEvery * 86400000;
+  }
+
   // ---------- Datenvalidierung (Import) ----------
   function sanitizeState(raw) {
     if (!raw || typeof raw !== 'object') throw new Error('Keine gültige Sicherungsdatei.');
@@ -213,7 +222,10 @@
     });
     var st = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
     function month(v, d) { v = Math.floor(+v); return v >= 1 && v <= 12 ? v : d; }
-    out.settings = { soupSat: st.soupSat !== false, soupFrom: month(st.soupFrom, 10), soupTo: month(st.soupTo, 4) };
+    out.settings = { soupSat: st.soupSat !== false, soupFrom: month(st.soupFrom, 10), soupTo: month(st.soupTo, 4),
+      backupEvery: [0, 7, 14, 30].indexOf(+st.backupEvery) >= 0 ? +st.backupEvery : 30,
+      remindBase: +st.remindBase > 0 ? +st.remindBase : Date.now(),
+      snoozeUntil: +st.snoozeUntil > 0 ? +st.snoozeUntil : 0 };
     var notes = raw.notes && typeof raw.notes === 'object' ? raw.notes : {};
     Object.keys(notes).forEach(function (k) {
       if (keyRe.test(k) && typeof notes[k] === 'string' && notes[k].trim()) out.notes[k] = notes[k].slice(0, 2000);
@@ -226,7 +238,7 @@
     holidayName: holidayName, easterSunday: easterSunday,
     normalize: normalize, tokens: tokens, similarity: similarity, findSimilar: findSimilar, isSameName: isSameName,
     conflicts: conflicts, lastEatenBefore: lastEatenBefore, autoFill: autoFill, swapDays: swapDays, insertMove: insertMove,
-    isSoupName: isSoupName, inSeason: inSeason, soupRule: soupRule,
+    isSoupName: isSoupName, backupDue: backupDue, inSeason: inSeason, soupRule: soupRule,
     sanitizeState: sanitizeState, NO_REPEAT_DAYS: NO_REPEAT_DAYS
   };
 })(typeof window !== 'undefined' ? window : globalThis);
