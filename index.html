@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="referrer" content="no-referrer">
+<title>Essensplan</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topbar">
+  <button class="iconbtn" id="prevWeek" aria-label="Eine Woche zurück">◀</button>
+  <button class="title" id="todayBtn" aria-label="Zur aktuellen Woche">
+    <span class="t1">Essensplan</span><span class="t2" id="rangeLabel"></span>
+  </button>
+  <button class="iconbtn" id="nextWeek" aria-label="Eine Woche vor">▶</button>
+</header>
+
+<main>
+  <section id="view-plan" class="view active">
+    <div class="grid" id="grid"></div>
+    <div class="actions">
+      <button class="btn primary" id="autoBtn">🎲 Automatisch füllen</button>
+      <button class="btn" id="clearBtn">🧹 Leeren</button>
+    </div>
+    <p class="hint">Tippen = bearbeiten · Lange drücken &amp; ziehen = verschieben</p>
+  </section>
+
+  <section id="view-meals" class="view">
+    <h2>Gerichte</h2>
+    <div class="row">
+      <input id="mealSearch" type="search" placeholder="Suchen oder neues Gericht…" autocomplete="off" maxlength="80" enterkeyhint="done">
+      <button class="btn primary small" id="mealAddBtn">＋</button>
+    </div>
+    <p class="muted" id="mealCount"></p>
+    <ul class="list" id="mealList"></ul>
+  </section>
+
+  <section id="view-notes" class="view">
+    <h2>Termine &amp; Notizen</h2>
+    <p class="muted">Für besondere Tage, z.&nbsp;B. „Weihnachten: Gans, Oma bringt Rotkohl“.</p>
+    <div class="card">
+      <label class="lbl" for="noteDate">Datum</label>
+      <input id="noteDate" type="date">
+      <label class="lbl" for="noteText">Notiz</label>
+      <textarea id="noteText" rows="3" maxlength="2000" placeholder="Was wurde besprochen?"></textarea>
+      <button class="btn primary" id="noteSave">💾 Notiz speichern</button>
+    </div>
+    <ul class="list" id="noteList"></ul>
+    <button class="btn ghost" id="showPastNotes">Vergangene anzeigen</button>
+  </section>
+
+  <section id="view-more" class="view">
+    <h2>Sicherung &amp; Einstellungen</h2>
+    <div class="card">
+      <p><strong>Wo sind die Daten?</strong> Nur auf diesem Handy, im Speicher der App. Nichts geht ins Internet.</p>
+      <p class="muted" id="persistInfo"></p>
+      <p class="muted" id="lastBackup"></p>
+      <button class="btn primary" id="exportBtn">⬇️ Sicherung speichern</button>
+      <button class="btn" id="importBtn">⬆️ Sicherung laden</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+    <div class="card">
+      <p class="muted" id="stats"></p>
+      <button class="btn" id="removeSeeds">Beispielgerichte entfernen</button>
+      <button class="btn danger" id="resetAll">Alles löschen</button>
+    </div>
+    <p class="muted center">Essensplan v1.1.1</p>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button class="tab active" data-view="plan"><span>📅</span>Plan</button>
+  <button class="tab" data-view="meals"><span>🍲</span>Gerichte</button>
+  <button class="tab" data-view="notes"><span>📝</span>Termine</button>
+  <button class="tab" data-view="more"><span>⚙️</span>Mehr</button>
+</nav>
+
+<dialog id="sheet" class="sheet"><div id="sheetBody"></div></dialog>
+<dialog id="confirm" class="confirm">
+  <p id="confirmText"></p>
+  <div class="confirm-btns" id="confirmBtns"></div>
+</dialog>
+<div id="snackbar" class="snackbar" role="status" aria-live="polite"><span id="snackText"></span><button id="snackBtn">Rückgängig</button></div>
+<div id="moveBanner" class="movebanner"><span>Ziel-Tag antippen…</span><button id="moveCancel">Abbrechen</button></div>
+
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
